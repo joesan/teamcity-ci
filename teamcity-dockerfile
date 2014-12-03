@@ -1,0 +1,56 @@
+# Step 0: Install base Ubuntu image
+FROM ubuntu
+MAINTAINER Joe San "codeintheopen@gmail.com"
+
+RUN apt-get update
+RUN apt-get install software-properties-common -y
+
+# install utilities
+RUN apt-get -y install vim git sudo zip wget curl unzip
+
+# Let us make a directory called softwares inside /opt
+RUN mkdir /opt/softwares
+
+# Step 1: Install Java 7, set Java Home
+RUN add-apt-repository ppa:webupd8team/java -y && \
+    apt-get update -y && \
+
+# Accept licence
+echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections && \
+     apt-get install oracle-java7-installer -y && \
+
+# Set JAVA_HOME
+ENV JAVA_HOME /usr/lib/jvm/java-7-oracle
+
+
+
+# Install team city server
+FROM continuous-integration/ubuntu-oracle-java7
+
+MAINTAINER Joe San "codeintheopen@gmail.com"
+
+# All TeamCity related data is stored in one place
+VOLUME ["/data/teamcity"]
+ENV TEAMCITY_DATA_PATH /data/teamcity
+
+# Download and install TeamCity
+ENV TEAMCITY_PACKAGE_VERSION TeamCity-8.1.5.tar.gz
+ENV TEAMCITY_DOWNLOAD_URL https://www.jetbrains.com/teamcity/download/
+RUN wget -q0- $TEAMCITY_DOWNLOAD_URL/$TEAMCITY_PACKAGE_VERSION | tar xvf -C /opt/softwares/
+
+EXPOSE 8111
+CMD ["/opt/softwares/TeamCity/bin/teamcity-server.sh", "run"]
+
+
+
+# docker run -e TEAMCITY_SERVER=http://yourserver:8111 -dt -p 9090:9090 continuous-integration/ubuntu-teamcity-agent
+
+FROM continuous-integration/ubuntu-oracle-java7
+
+MAINTAINER Joe San "codeintheopen@gmail.com"
+
+ADD setup-agent.sh /setup-agent.sh
+RUN adduser teamcity
+
+EXPOSE 9090
+CMD sudo -u teamcity -s -- sh -c "TEAMCITY_SERVER=$TEAMCITY_SERVER bash /setup-agent.sh run"
